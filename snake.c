@@ -56,12 +56,38 @@ int main(void) {
 
         int ny = snake[0].y + dy;
         int nx = snake[0].x + dx;
-        if(ny >= 1 && ny < rows && nx >= 0 && nx < cols){
-            memmove(&snake[1], &snake[0], (len - 1) * sizeof(Point)); 
-            snake[0].y = ny;
-            snake[0].x = nx;
-        }    
+
+        if (ny < 1 || ny >= rows || nx < 0 || nx >= cols){
+            break;
+        }
+
+        int bateu = 0;
+
+        for (int i = 0; i < len - 1; i++){
+            if (snake[i].y == ny && snake[i].x == nx) {
+            bateu = 1;
+            break;
+            }
+        }
+
+        if(bateu){
+            break;
+        }
+
+        memmove(&snake[1], &snake[0], (len - 1) * sizeof(Point));
+        snake[0].y = ny;
+        snake[0].x = nx;
     }
+    erase();
+    
+    mvprintw(rows / 2, (cols - 9) / 2, "GAME OVER");
+    mvprintw(rows / 2 + 1, (cols - 22) / 2, "Pressione uma tecla...");
+    
+    refresh();
+    
+    timeout(-1);
+    
+    getch();
 
     endwin();
     return 0;
