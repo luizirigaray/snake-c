@@ -1,4 +1,5 @@
 #include <ncurses.h>
+#include <string.h>
 
 #define KEY_ESC 27
 #define DELAY_MS 100
@@ -55,10 +56,11 @@ int main(void) {
 
         int ny = snake[0].y + dy;
         int nx = snake[0].x + dx;
-        if (ny >= 1 && ny < rows && nx >= 0 && nx < cols) {
+        if(ny >= 1 && ny < rows && nx >= 0 && nx < cols){
+            memmove(&snake[1], &snake[0], (len - 1) * sizeof(Point)); 
             snake[0].y = ny;
             snake[0].x = nx;
-        }
+        }    
     }
 
     endwin();
