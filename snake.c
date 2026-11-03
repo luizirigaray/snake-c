@@ -1,27 +1,15 @@
-#include <ncurses.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
+#include "snake.h"
 
-#define KEY_ESC 27
-#define DELAY_MS 100
-#define MIN_DELAY_MS 40
-#define MAX_LEN 100
-#define INITIAL_LEN 5
-
-typedef struct {
-    int y;
-    int x;
-} Point;
-
-static void spawn_food(Point *food, const Point *snake, int len, int rows, int cols) {
+static void spawn_food(Game *g) {
     int ok;
     do {
-        food->y = 1 + rand() % (rows - 1);
-        food->x = rand() % cols;
+        g->food.y = 1 + rand() % (g->rows - 1);
+        g->food.x = rand() % g->cols;
         ok = 1;
-        for (int i = 0; i < len; i++) {
-            if (snake[i].y == food->y && snake[i].x == food->x) {
+        for (int i = 0; i < g->len; i++) {
+            if (g->body[i].y == g->food.y && g->body[i].x == g->food.x) {
                 ok = 0;
                 break;
             }
@@ -29,131 +17,60 @@ static void spawn_food(Point *food, const Point *snake, int len, int rows, int c
     } while (!ok);
 }
 
-int main(void) {
-    initscr();
-    set_escdelay(25);
-    noecho();
-    curs_set(0);
-    keypad(stdscr, TRUE);
-    srand(time(NULL));
+void game_init(Game *g, int rows, int cols) {
+    g->rows = rows;
+    g->cols = cols;
+    g->len = INITIAL_LEN;
+    for (int i = 0; i < g->len; i++) {
+        g->body[i].y = rows / 2;
+        g->body[i].x = cols / 2 - i;
+    }
+    g->dy = 0;
+    g->dx = 1;
+    g->score = 0;
+    spawn_food(g);
+}
 
-    int rows, cols;
-    getmaxyx(stdscr, rows, cols);
+void game_set_direction(Game *g, int dy, int dx) {
+    if (dy == -g->dy && dx == -g->dx) {
+        return;   // proibe inverter 180 graus
+    }
+    g->dy = dy;
+    g->dx = dx;
+}
 
-    int quit = 0;
+MoveResult game_step(Game *g) {
+    int ny = g->body[0].y + g->dy;
+    int nx = g->body[0].x + g->dx;
 
-    while (!quit) {
-        // ---- estado inicial de uma partida ----
-        Point snake[MAX_LEN];
-        int len = INITIAL_LEN;
-        for (int i = 0; i < len; i++) {
-            snake[i].y = rows / 2;
-            snake[i].x = cols / 2 - i;
-        }
+    if (ny < 1 || ny >= g->rows || nx < 0 || nx >= g->cols) {
+        return MOVE_DEAD;
+    }
 
-        int dy = 0;
-        int dx = 1;
-        int score = 0;
-        int paused = 0;
-
-        Point food;
-        spawn_food(&food, snake, len, rows, cols);
-
-        // ---- loop da partida ----
-        while (1) {
-            int delay = DELAY_MS - (len - INITIAL_LEN) * 5;
-            if (delay < MIN_DELAY_MS) {
-                delay = MIN_DELAY_MS;
-            }
-            timeout(delay);
-
-            erase();
-            mvprintw(0, 0, "Pontos: %d | Tamanho: %d | p pausa, Esc sai", score, len);
-            mvaddch(food.y, food.x, '*');
-            for (int i = len - 1; i >= 0; i--) {
-                char c = (i == 0) ? '@' : 'o';
-                mvaddch(snake[i].y, snake[i].x, c);
-            }
-            if (paused) {
-                mvprintw(rows / 2, (cols - 7) / 2, "PAUSADO");
-            }
-            refresh();
-
-            int ch = getch();
-            if (ch == KEY_ESC) {
-                quit = 1;
-                break;
-            }
-            if (ch == 'p') {
-                paused = !paused;
-            }
-            if (paused) {
-                continue;
-            }
-
-            switch (ch) {
-                case KEY_UP:    if (dy != 1)  { dy = -1; dx = 0; } break;
-                case KEY_DOWN:  if (dy != -1) { dy = 1;  dx = 0; } break;
-                case KEY_LEFT:  if (dx != 1)  { dy = 0;  dx = -1; } break;
-                case KEY_RIGHT: if (dx != -1) { dy = 0;  dx = 1; } break;
-            }
-
-            int ny = snake[0].y + dy;
-            int nx = snake[0].x + dx;
-
-            if (ny < 1 || ny >= rows || nx < 0 || nx >= cols) {
-                break;
-            }
-
-            int bateu = 0;
-            for (int i = 0; i < len - 1; i++) {
-                if (snake[i].y == ny && snake[i].x == nx) {
-                    bateu = 1;
-                    break;
-                }
-            }
-            if (bateu) {
-                break;
-            }
-
-            int comeu = (ny == food.y && nx == food.x);
-            if (comeu && len < MAX_LEN) {
-                len++;
-            }
-
-            memmove(&snake[1], &snake[0], (len - 1) * sizeof(Point));
-            snake[0].y = ny;
-            snake[0].x = nx;
-
-            if (comeu) {
-                score += 10;
-                spawn_food(&food, snake, len, rows, cols);
-            }
-        }
-
-        if (quit) {
-            break;
-        }
-
-        // ---- tela de fim de jogo ----
-        erase();
-        mvprintw(rows / 2 - 1, (cols - 9) / 2, "GAME OVER");
-        mvprintw(rows / 2, (cols - 12) / 2, "Pontos: %d", score);
-        mvprintw(rows / 2 + 2, (cols - 24) / 2, "r = jogar de novo");
-        mvprintw(rows / 2 + 3, (cols - 24) / 2, "Esc = sair");
-        refresh();
-
-        timeout(-1);
-        int k;
-        do {
-            k = getch();
-        } while (k != 'r' && k != KEY_ESC);
-
-        if (k == KEY_ESC) {
-            quit = 1;
+    for (int i = 0; i < g->len - 1; i++) {
+        if (g->body[i].y == ny && g->body[i].x == nx) {
+            return MOVE_DEAD;
         }
     }
 
-    endwin();
-    return 0;
+    int ate = (ny == g->food.y && nx == g->food.x);
+    if (ate && g->len < MAX_LEN) {
+        g->len++;
+    }
+
+    memmove(&g->body[1], &g->body[0], (g->len - 1) * sizeof(Point));
+    g->body[0].y = ny;
+    g->body[0].x = nx;
+
+    if (ate) {
+        g->score += 10;
+        spawn_food(g);
+        return MOVE_ATE;
+    }
+    return MOVE_OK;
+}
+
+int game_delay_ms(const Game *g) {
+    int delay = DELAY_MS - (g->len - INITIAL_LEN) * 5;
+    return delay < MIN_DELAY_MS ? MIN_DELAY_MS : delay;
 }
