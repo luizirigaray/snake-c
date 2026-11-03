@@ -1,5 +1,7 @@
 #include <ncurses.h>
 #include <string.h>
+#include <stdlib.h>
+#include <time.h>
 
 #define KEY_ESC 27
 #define DELAY_MS 100
@@ -32,6 +34,21 @@ int main(void) {
     int dy = 0;
     int dx = 1;
 
+    srand(time(NULL));
+    Point food;
+    int ok;
+    do{
+        food.y = 1 + rand() % rows - 1;
+        food.x = rand() % cols;
+        ok = 1;
+        for (int i = 0; i < len; i++){
+            if (snake[i].y == food.y && snake[i].x == food.x){
+                ok = 0;
+                break;
+            }
+        }
+    }while(!ok);
+
     while (1) {
         erase();
         mvprintw(0, 0, "Setas mudam a direcao, Esc sai | len=%d", len);
@@ -40,6 +57,7 @@ int main(void) {
             char c = (i == 0) ? '@' : 'o';
             mvaddch(snake[i].y, snake[i].x, c);
         }
+        mvaddch(food.y,food.x, '*');
         refresh();
 
         int ch = getch();
@@ -73,10 +91,30 @@ int main(void) {
         if(bateu){
             break;
         }
+        
+        int comeu = (ny == food.y && nx == food.x);
+        
+        if(comeu && len < MAX_LEN){
+            len++;
+        }
 
         memmove(&snake[1], &snake[0], (len - 1) * sizeof(Point));
         snake[0].y = ny;
         snake[0].x = nx;
+
+        if (comeu) {
+            do {
+            food.y = 1 + rand() % (rows - 1);
+            food.x = rand() % cols;
+            ok = 1;
+            for (int i = 0; i < len; i++) {
+                if (snake[i].y == food.y && snake[i].x == food.x) {
+                    ok = 0;
+                    break;
+                }
+            }
+    } while (!ok);
+}
     }
     erase();
     
